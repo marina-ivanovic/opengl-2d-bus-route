@@ -25,7 +25,7 @@ float stationPos[10][2] = {
 };
 
 // --- TEXTURES ---
-unsigned int busTexture, circleTexture;
+unsigned int busTexture, circleTexture, controlTexture, openTexture, closedTexture, nameTexture;
 unsigned int stationsTexture[10];
 unsigned int numbersTexture[10];
 float pathControlPoints[10][2];
@@ -99,6 +99,27 @@ void createPathVAO(unsigned int& VAO, unsigned int& VBO, int slices) {
     glEnableVertexAttribArray(1);
 }
 
+void drawUIElement(unsigned int texture, float x, float y, unsigned int shader, unsigned int VAO, int uPosLoc) {
+
+    glUniform1i(glGetUniformLocation(shader, "uUseTexture"), 1);
+    glUniform4f(glGetUniformLocation(shader, "uColor"), 1.0f, 1.0f, 1.0f, 1.0f);
+
+    glBindVertexArray(VAO);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glUniform2f(uPosLoc, x, y);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+}
+
+void drawNumber(int number, float x, float y, float size, unsigned int* numTextures, unsigned int shader, unsigned int VAO, int uPosLoc) {
+    int tens = (number / 10) % 10;
+    int units = number % 10;
+
+    if (number >= 10) {
+        drawUIElement(numTextures[tens], x, y, shader, VAO, uPosLoc);
+    }
+    drawUIElement(numTextures[units], x + 0.06f, y, shader, VAO, uPosLoc);
+}
+
 void createCircle(unsigned int& VAO, unsigned int& VBO, float radius) {
     float circleVertices[(40 + 2) * 4];
     float r = radius;
@@ -149,7 +170,7 @@ void mouse_callback(GLFWwindow* window, int button, int action, int mods) {
                 if (busState.passengers < 50) busState.passengers++;
             }
             if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-                if (busState.passengers > 0) busState.passengers--;
+                if ((busState.passengers > 0 && !busState.hasControl) || (busState.passengers > 1 && busState.hasControl)) busState.passengers--;
             }
         }
     }
@@ -180,7 +201,7 @@ int main() {
     screenWidth = mode->width;
     screenHeight = mode->height;
 
-    GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "Bus Projekat", primaryMonitor, NULL);
+    GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "Bus Route Tracker", primaryMonitor, NULL);
     if (!window) { glfwTerminate(); return -1; }
     glfwMakeContextCurrent(window);
 
@@ -209,6 +230,10 @@ int main() {
 
     // Texture Loading
     busTexture = loadImageToTexture("Resources/bus.png"); configureTexture(busTexture);
+    controlTexture = loadImageToTexture("Resources/control.png"); configureTexture(controlTexture);
+    openTexture = loadImageToTexture("Resources/open.png"); configureTexture(openTexture);
+    closedTexture = loadImageToTexture("Resources/closed.png"); configureTexture(closedTexture);
+    nameTexture = loadImageToTexture("Resources/name.png"); configureTexture(nameTexture);
 
     for (int i = 0; i < 10; ++i) {
         std::string path = "Resources/station" + std::to_string(i) + ".png";
@@ -216,12 +241,17 @@ int main() {
         configureTexture(stationsTexture[i]);
     }
 
-    backgroundTexture = loadImageToTexture("Resources/novisad.png");
-    configureTexture(backgroundTexture);
+    for (int i = 0; i < 10; ++i) {
+        std::string path = "Resources/num" + std::to_string(i) + ".png";
+        numbersTexture[i] = loadImageToTexture(path.c_str());
+        configureTexture(numbersTexture[i]);
+    }
+
+    backgroundTexture = loadImageToTexture("Resources/novisad.png"); configureTexture(backgroundTexture);
 
     // VAO Creation
     unsigned int VAO_Background, VBO_Background;
-    // --- MANUAL BACKGROUND CREATION (To be 100% sure) ---
+
     float bgVertices[] = {
         // X      Y      U     V
         -1.0f, -1.0f,  0.0f, 0.0f,
@@ -241,7 +271,26 @@ int main() {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    // --------------------------------------------------------
+
+    // 2. NAME TAG
+    unsigned int VAO_Name, VBO_Name;
+    float w = 0.5f;
+    float h = 0.2f;
+    float nameVertices[] = {
+        -w / 2, -h / 2, 0.0f, 0.0f,
+         w / 2, -h / 2, 1.0f, 0.0f,
+         w / 2,  h / 2, 1.0f, 1.0f,
+        -w / 2,  h / 2, 0.0f, 1.0f
+    };
+    glGenVertexArrays(1, &VAO_Name);
+    glGenBuffers(1, &VBO_Name);
+    glBindVertexArray(VAO_Name);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_Name);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(nameVertices), nameVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     unsigned int VAO_Station, VBO_Station;
     createCircle(VAO_Station, VBO_Station, 0.06f);
@@ -254,6 +303,11 @@ int main() {
     initRandomPaths();
     createPathVAO(VAO_Path, VBO_Path, slicesPerCurve);
 
+    unsigned int VAO_UI, VBO_UI;
+    createQuad(VAO_UI, VBO_UI, 0.17f);
+    
+    // ---------------------------------------
+
     // Shaders and Uniforms
     unsigned int shader = createShader("bus.vert", "bus.frag");
     int uPosLoc = glGetUniformLocation(shader, "uPos");
@@ -263,7 +317,7 @@ int main() {
     int uUseTexLoc = glGetUniformLocation(shader, "uUseTexture");
     float aspectRatio = (float)screenWidth / (float)screenHeight;
 
-    glLineWidth(3.0f);
+    glLineWidth(5.0f);
     double lastTime = glfwGetTime();
 
     // --- MAIN LOOP ---
@@ -307,7 +361,7 @@ int main() {
         }
 
         // 2. RENDER
-        glClear(GL_COLOR_BUFFER_BIT); // CLEAR SCREEN FIRST!
+        glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(shader);
 
         // A) BACKGROUND
@@ -363,6 +417,42 @@ int main() {
 
         glUniform2f(uPosLoc, busX, busY);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+        // E) UI ELEMENTS (Corner Icons)
+
+        float marginX = 0.17f;
+        float marginY = 0.17f;
+
+        // 1. DOORS (Bottom-Left)
+        unsigned int doorTex = busState.doorsOpen ? openTexture : closedTexture;
+        drawUIElement(doorTex, (-1.0f * aspectRatio) + marginX, -1.0f + marginY, shader, VAO_UI, uPosLoc);
+
+        // 2. CONTROL (Top-Right)
+        if (busState.hasControl) {
+            drawUIElement(controlTexture, (1.0f * aspectRatio) - marginX, 1.0f - marginY, shader, VAO_UI, uPosLoc);
+        }
+
+        // 3. PASSENGERS & FINES (Top-Left)
+
+        // Passengers (Top Left)
+        drawNumber(busState.passengers, (-1.0f * aspectRatio) + marginX, 1.0f - marginY, 0.0f, numbersTexture, shader, VAO_Bus, uPosLoc);
+
+        // Fines (Below Passengers)
+        drawNumber(busState.fines, (-1.0f * aspectRatio) + marginX, 1.0f - marginY - 0.15f, 0.0f, numbersTexture, shader, VAO_Bus, uPosLoc);
+
+        // 4. NAME TAG (Bottom-Right)
+
+        glUniform1i(uUseTexLoc, 1);
+        glBindVertexArray(VAO_Name);
+        glBindTexture(GL_TEXTURE_2D, nameTexture);
+
+        glUniform4f(uColorLoc, 1.0, 1.0, 1.0, 0.7f);
+
+        glUniform2f(uPosLoc, (1.0f * aspectRatio) - 0.22f , -0.9f);
+
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+        glUniform4f(uColorLoc, 1.0, 1.0, 1.0, 1.0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
