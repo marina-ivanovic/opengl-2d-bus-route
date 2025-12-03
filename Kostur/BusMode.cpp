@@ -1,0 +1,1 @@
+enum BusMode { MOVING, WAITING };

@@ -128,10 +128,13 @@
     <ClCompile Include="Source\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BusState.h" />
     <ClInclude Include="Header\stb_image.h" />
     <ClInclude Include="Header\Util.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="bus.frag" />
+    <None Include="bus.vert" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
