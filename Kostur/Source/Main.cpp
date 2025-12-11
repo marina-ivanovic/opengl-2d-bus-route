@@ -32,7 +32,7 @@ void mouse_callback(GLFWwindow* window, int button, int action, int mods) {
     if (busState.mode == WAITING && busState.doorsOpen) {
         if (action == GLFW_PRESS) {
             if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                if (busState.passengers < 50) busState.passengers++;
+                if ((busState.passengers < 50 && !busState.hasControl) || (busState.passengers < 49 && busState.hasControl)) busState.passengers++;
             }
             if (button == GLFW_MOUSE_BUTTON_RIGHT) {
                 if ((busState.passengers > 0 && !busState.hasControl) || (busState.passengers > 1 && busState.hasControl)) busState.passengers--;
@@ -46,7 +46,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         glfwSetWindowShouldClose(window, GL_TRUE);
 
     if (key == GLFW_KEY_K && action == GLFW_PRESS) {
-        if (busState.mode == WAITING && busState.doorsOpen && !busState.hasControl) {
+        if (busState.mode == WAITING && busState.doorsOpen && !busState.hasControl && busState.passengers < 50) {
             busState.hasControl = true;
             busState.passengers++;
         }
