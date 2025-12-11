@@ -124,13 +124,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Geometry.cpp" />
+    <ClCompile Include="MathUtils.cpp" />
+    <ClCompile Include="Rendering.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\Util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BusState.h" />
+    <ClInclude Include="Constants.h" />
+    <ClInclude Include="Geometry.h" />
     <ClInclude Include="Header\stb_image.h" />
     <ClInclude Include="Header\Util.h" />
+    <ClInclude Include="MathUtils.h" />
+    <ClInclude Include="Rendering.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="bus.frag" />
